@@ -48,7 +48,7 @@ def _extract_events(req_body: Any) -> List[Dict[str, Any]]:
 def _enrich_event(event: Dict[str, Any], trace_id: str, default_received_at: str) -> Dict[str, Any]:
     enriched_event = dict(event)
     enriched_event.setdefault("id", str(uuid4()))
-    enriched_event.setdefault("ingestionId", trace_id)
+    enriched_event.setdefault("tracId", trace_id)
     enriched_event.setdefault("receivedAt", default_received_at)
     return enriched_event
 
@@ -84,13 +84,13 @@ def ingest_telemetry(req: func.HttpRequest, event: func.Out[str], cosmos: func.O
         req_body = req.get_json()
     except ValueError:
         logging.warning("Rejected request with invalid JSON trace_id=%s", trace_id)
-        return _json_response({"error": "Invalid JSON payload", "ingestionId": trace_id}, 400)
+        return _json_response({"error": "Invalid JSON payload", "tracId": trace_id}, 400)
 
     try:
         events = _extract_events(req_body)
     except ValueError as exc:
         logging.warning("Rejected telemetry payload trace_id=%s reason=%s", trace_id, exc)
-        return _json_response({"error": str(exc), "ingestionId": trace_id}, 400)
+        return _json_response({"error": str(exc), "tracId": trace_id}, 400)
 
     enriched_events = [_enrich_event(evt, trace_id, default_received_at) for evt in events]
     logging.info(
