@@ -18,8 +18,8 @@ The function app is modularized using the Azure Functions Blueprints pattern.
    - The function now enforces a tighter contract:
      - accepts either a single JSON object, an array of JSON objects, or `{ "events": [...] }`
      - rejects empty payloads, non-object events, and batches larger than 500 events
-     - enriches each accepted event with `id`, `tracId`, and `receivedAt` if they are not already present
-   - The HTTP response includes `tracId` so downstream Event Hub and Cosmos activity can be correlated with the original request.
+     - enriches each accepted event with `id`, `traceId`, and `receivedAt` if they are not already present
+   - The HTTP response includes `traceId` so downstream Event Hub and Cosmos activity can be correlated with the original request.
 
 2. **`eventhub_to_cosmos` (Event Hub Trigger)**
    - **Description**: Acts as an asynchronous consumer for the `ai-eval-telemetry` Event Hub. 
@@ -42,7 +42,7 @@ The initial implementation was structurally sound, but there were a few operatio
 
 3. **No stable correlation metadata was added to events**
    - The original code returned `202 Accepted` but did not stamp events with a request-level correlation identifier or guaranteed document identifier.
-   - Implemented: events now default `id`, `tracId`, and `receivedAt` so requests, Event Hub messages, and Cosmos documents can be tied together.
+   - Implemented: events now default `id`, `traceId`, and `receivedAt` so requests, Event Hub messages, and Cosmos documents can be tied together.
 
 4. **Operational logging was too sparse**
    - The original logs were mostly debug-only and did not capture dropped Event Hub messages or accepted batch identity.
