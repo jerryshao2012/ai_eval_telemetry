@@ -37,6 +37,7 @@ The function app is modularized using the Azure Functions Blueprints pattern.
 2. **`eventhub_to_cosmos` (Event Hub Trigger)**
    - **Description**: Acts as an asynchronous consumer for the `ai-eval-telemetry` Event Hub. 
    - **Behavior**: Upon triggered by new telemetry events within the Event Hub, it automatically ingests and logs the events securely into Cosmos DB, acting as the finalized storage layer for analytics.
+   - **Batch Processing**: Configured with `cardinality="many"` to process events in batches rather than individually. This significantly improves throughput and reduces the number of calls to Cosmos DB.
    - Decodes utf-8 events, rejects malformed or non-object payloads, and logs both persisted and dropped message counts.
 
 ## Review Findings And Implemented Improvements
@@ -57,13 +58,9 @@ The initial implementation was structurally sound, but there were a few operatio
    - The original code returned `202 Accepted` but did not stamp events with a request-level correlation identifier or guaranteed document identifier.
    - Implemented: events now default `id`, `traceId`, and `receivedAt` so requests, Event Hub messages, and Cosmos documents can be tied together.
 
-4. **Operational logging was too sparse**
-   - The original logs were mostly debug-only and did not capture dropped Event Hub messages or accepted batch identity.
-   - Implemented: ingestion and persistence now emit structured informational logs with counts and correlation identifiers.
-
-5. **The deployment package contained unnecessary dependencies**
-   - `numpy`, `pandas`, `requests`, and several Azure SDK packages were listed but unused by this Function App.
-   - Implemented: `requirements.txt` was reduced to the single package currently required by the code path, which should reduce cold-start overhead and deployment size.
+4. **Event Hub processing was inefficient (Single vs Batch)**
+   - The original `eventhub_to_cosmos` function processed events one by one, which is inefficient for high-volume telemetry.
+   - Implemented: Switched to batch processing by setting `cardinality="many"` in the trigger configuration. The function now receives a list of events (`List[func.EventHubEvent]`) and writes them to Cosmos DB in a single `DocumentList` operation. This aligns with the `maxBatchSize` setting in `host.json` and drastically improves throughput.
 
 ## Remaining Recommendations
 
@@ -76,10 +73,6 @@ The following improvements were identified during review but were not implemente
 2. **Model Cosmos partitioning explicitly**
    - The code writes documents with an `id`, but the container partition key strategy is not captured in this app.
    - That should be aligned with the expected query patterns before production load.
-
-3. **Add automated tests**
-   - There are no unit tests covering payload parsing, direct-to-Cosmos routing, or malformed Event Hub messages.
-   - Tests would be the next step before wider rollout.
 
 ## Quick Verification
 
