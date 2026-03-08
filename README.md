@@ -1,21 +1,46 @@
-# AI Eval Telemetry
+# Azure CDKTF Repository
 
-This implementation of the telemetry API (POST /api/telemetry) using the **Azure Functions v2 programming model for Python**.
+This repository contains the cdktf for deploying code to Azure Sandbox environment
 
-This approach is significantly simpler and more scalable than running a traditional web framework (like Flask/FastAPI) because it uses native Event Hub Output Bindings. Instead of managing your own background threads, asyncio event loops, and SDK clients (like in your current`api.py`), you simply return the JSON payload, and the Azure Functions host handles the batching, retry logic, and connection polling to drop it into Event Hubs.
+# Repository Structure and Overview
+ The CDK code is organized under the infra folder, which contains three main libraries: bin, lib, and services.
+- The services folder is where the actual functionality within an app's service or function is written in Python code.
+- The bin and lib folders refer to CDK and the logic and naming for the resources.
+- The starting point for the code is infra.ts, where specific services are imported and new instances are created.
+- Each service has a corresponding .ts file in the lib folder, which is then imported into infra.ts to create new instances of the service.
 
-1. function_app.py
-This is your main Azure Function entry point.
-2. local.settings.json (For Local Development)
-When running this locally with func start, you'll define your Event Hub connection string here. In production, this matches the App Settings configured in Azure (or Key Vault references).
-3. host.json
-Azure Functions controls the batched output behavior automatically. You can tune the underlying Event Hub host extension in host.json to control how quickly it drains buffered events.
+```
+├───.github
+│   ├───ISSUE_TEMPLATE
+│   └───workflows
+├───infra
+│   ├───bin
+│   └───lib
+└───service
+    └───functions
+```
 
-Why this approach?
+# Steps to create Resources
+1. For each services, create a service speicifc .ts file under infra/library
+2. Import this library and initialize this service class in infra.ts
+3. Update package.json with cdktf dependency for that service under dependancy
+4. Create a pull request
+5. comment the PR with specific text/format to trigger individual or shared resource deployment pipeline
 
-The telemetry API (e.g., `POST /api/telemetry`) has one job: receive a JSON payload, validate it, and drop it into Azure Event Hubs as fast as possible.
-1. **Instant, Elastic Scaling for Bursty Traffic**: Telemetry data is notoriously bursty. Azure Functions (especially on a Consumption or Premium plan) can instantly scale out to handle thousands of concurrent ingestion requests and scale down to zero when idle. AKS Horizontal Pod Autoscaling (HPA) is generally slower to react to sudden spikes.
-   * **Concurrency and Backpressure**: You no longer need `queue_max_size` or explicit `enqueue_timeout_seconds` in your own code. The Azure Function host inherently drops HTTP 429 limits or scales horizontally if traffic spikes, ensuring your container doesn't experience `OutOfMemory` errors trying to buffer bursts locally.
-   * **Speed**: The function executes incredibly fast. It simply parses the incoming payload, validates shape, delegates the payload to the `event: func.Out` parameter, and immediately returns a `202 Accepted`. The platform then async-flushes this to Event Hub in the background.
-2. **Native Event Hubs Bindings**: Azure Functions has native Output Bindings for Event Hubs. You don't need to write connection pooling or complex retry logic; you simply return the telemetry JSON payload from the function, and the platform handles bulk-publishing it to Event Hubs highly efficiently.
-3. **Cost Efficiency**: Because the ingestion endpoint does minimal compute (just parsing a payload and pushing to a queue), the execution time will be in the low milliseconds. Serverless micro-billing is incredibly cost-effective for fast, I/O-bound operations.
+For example, for the app service, the app service file is imported from the cdktf library, and a new app service environment is created with specific naming conventions. This process is repeated for each service, ensuring that each service has its own specific file in the lib folder
+
+# GitHub Actions and Deployment:
+The workflow file in the .github folder contains the YAML configuration that defines the steps for deployment, including a diff check and ensuring files in lib meet standards before deploying services.
+- Triggering Actions: GitHub actions are triggered by a specific command in a pull request. This command initiates the workflow defined in the .github folder, which contains the YAML configuration for deployment.
+
+```
+# Add the following comment if you are deploying to your speicifc resource group
+/cdktf:sbx,1,cc1
+```
+
+```
+# if you are deploying to a shared resource group ,Add label CloudEng in PR and CE approval is mandatory to trigger the pipeline
+/cdktf:shr,1,cc1
+```
+- Workflow Steps: The workflow file includes steps such as a diff check to ensure that no base parameters set by CE are changed. It also checks that the files in the lib folder meet the required standards before proceeding with the deployment of services.
+- Deployment Process: The deployment process involves running the infra.ts file, which imports and sets up the necessary services. The YAML file defines the events that trigger the deployment and the specific actions to be taken during the deployment process
