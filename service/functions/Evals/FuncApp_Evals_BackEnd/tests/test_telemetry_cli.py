@@ -122,11 +122,11 @@ class TelemetryFunctionTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 202)
         self.assertEqual(payload["target"], "eventhub")
-        self.assertEqual(payload["ingestionId"], "req-123")
+        self.assertEqual(payload["traceId"], "req-123")
         self.assertEqual(len(event_out.value), 1)
         emitted = json.loads(event_out.value[0])
         self.assertEqual(emitted["eventType"], "eval.completed")
-        self.assertEqual(emitted["ingestionId"], "req-123")
+        self.assertEqual(emitted["traceId"], "req-123")
         self.assertIn("id", emitted)
         self.assertIn("receivedAt", emitted)
         self.assertIsNone(cosmos_out.value)
@@ -157,7 +157,7 @@ class TelemetryFunctionTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 400)
         self.assertEqual(payload["error"], "Invalid JSON payload")
-        self.assertIn("ingestionId", payload)
+        self.assertIn("traceId", payload)
 
     def test_ingest_rejects_non_object_event(self):
         req = func.HttpRequest(body={"events": [{"eventType": "ok"}, "bad"]})

@@ -102,13 +102,11 @@ def ingest_telemetry(req: func.HttpRequest, event: func.Out[str], cosmos: func.O
 
     if target == "cosmosdb":
         cosmos_docs = func.DocumentList([func.Document.from_dict(e) for e in enriched_events])
-        for doc in cosmos_docs:
-            cosmos.set(doc)
+        cosmos.set(cosmos_docs)
         logging.info("Queued telemetry batch for Cosmos DB trace_id=%s event_count=%d", trace_id, len(enriched_events))
     else:
         formatted_events = [json.dumps(e) for e in enriched_events]
-        for formatted_event in formatted_events:
-            event.set(formatted_event)
+        event.set(formatted_events)
         logging.info("Queued telemetry batch for Event Hub trace_id=%s event_count=%d", trace_id, len(enriched_events))
 
     return _json_response(
@@ -116,7 +114,7 @@ def ingest_telemetry(req: func.HttpRequest, event: func.Out[str], cosmos: func.O
             "status": "accepted",
             "emitted": len(enriched_events),
             "target": target,
-            "trace_id": trace_id,
+            "traceId": trace_id,
         },
         202,
     )
@@ -161,8 +159,7 @@ def eventhub_to_cosmos(azeventhub: List[func.EventHubEvent], cosmos: func.Out[fu
 
     if events_to_save:
         cosmos_docs = func.DocumentList(events_to_save)
-        for doc in cosmos_docs:
-            cosmos.set(doc)
+        cosmos.set(cosmos_docs)
         logging.info(
             "Saved telemetry batch from Event Hub to Cosmos DB saved_count=%d dropped_count=%d",
             len(events_to_save),
