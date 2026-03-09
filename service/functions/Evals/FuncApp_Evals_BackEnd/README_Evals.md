@@ -74,6 +74,37 @@ The following improvements were identified during review but were not implemente
    - The code writes documents with an `id`, but the container partition key strategy is not captured in this app.
    - That should be aligned with the expected query patterns before production load.
 
+3. **Eliminate or drastically reduce cold starts**
+
+   3.1. Upgrade to the Azure Functions Premium Plan (Recommended)
+
+   The **Consumption Plan** is designed to scale down to zero when there's no traffic. When a new request arrives, Azure has to allocate a server, start the Python worker, and load your code—causing the 20-second delay.
+
+   The **Elastic Premium Plan (EP)** provides dynamic scale but allows you to specify pre-warmed instances. 
+   - **Always Ready Instances:** You can configure a minimum number of instances that are always running and ready to handle traffic instantly (0 cold start).
+   - **Pre-warmed Instances:** As your traffic grows, Azure will warm up the next instance *before* routing traffic to it, preventing cold starts during scale-out events.
+
+   *How to implement:* When provisioning your infrastructure (e.g., in your CDKTF `infra` codebase mentioned in your README), change the App Service Plan SKU from `Y1` (Consumption) to `EP1`, `EP2`, or `EP3` (Premium), and set the `minimum_elastic_instance_count`.
+
+   3.2. Use a Dedicated App Service Plan
+
+   If you have steady, predictable traffic, you can host the Function App on a **Dedicated App Service Plan** (Basic, Standard, Premium v2/v3).
+   - Your functions run on dedicated VMs just like a standard web app.
+     - Turn on the **"Always On"** setting in the Function App configuration. This prevents the idle timeout that stops the worker process.
+     - **Pros:** Zero cold starts. Predictable billing.
+     - **Cons:** You pay for the VMs 24/7 regardless of traffic. It does not scale out as aggressively as the Premium plan.
+
+   3.3. Code & Configuration Optimizations (If stuck on Consumption)
+
+   If you absolutely *must* stay on the Consumption plan, you can't eliminate cold starts entirely, but you can shave a few seconds off the 20-second duration:
+
+   * **Avoid Global Scope Heavy Operations:** Ensure you aren't doing heavy lifting outside of your function handlers. Imports take time in Python. Lazy-load modules inside the function (`import my_heavy_module` inside [ingest_telemetry](telemetry/telemetry_api.py) if they aren't needed by every execution.
+   * **Run from Package:** Enable `WEBSITE_RUN_FROM_PACKAGE=1` in your deployment settings. This mounts your deployment zip file directly as a read-only directory, dramatically improving I/O performance during startup compared to reading individual files scattered across the Azure file share.
+   * **Worker Indexing:** You already have `"AzureWebJobsFeatureFlags": "EnableWorkerIndexing"` in your [local.settings.json](local.settings.json). Ensure this is set in production. It allows Azure to index your functions natively without spinning up the heavy Python language worker just to figure out what your functions are.
+
+### Summary
+If a 20-second cold start is a hard blocker for your business requirements, **upgrading to the Premium Plan with `Always Ready` instances is the only guaranteed solution** to practically eliminate it for an HTTP-triggered Telemetry API. Code optimizations on the Consumption plan might bring it down to 5-10 seconds, but never to zero.
+
 ## Quick Verification
 
 Run the local command-line verification script:
