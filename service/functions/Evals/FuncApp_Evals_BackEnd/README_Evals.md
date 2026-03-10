@@ -86,7 +86,7 @@ The following improvements were identified during review but were not implemente
 
    *How to implement:* When provisioning your infrastructure (e.g., in your CDKTF `infra` codebase mentioned in your README), change the App Service Plan SKU from `Y1` (Consumption) to `EP1`, `EP2`, or `EP3` (Premium), and set the `minimum_elastic_instance_count`.
 
-   3.2. Use a Dedicated App Service Plan
+   3.2. **Use a Dedicated App Service Plan** (current plan)
 
    If you have steady, predictable traffic, you can host the Function App on a **Dedicated App Service Plan** (Basic, Standard, Premium v2/v3).
    - Your functions run on dedicated VMs just like a standard web app.
