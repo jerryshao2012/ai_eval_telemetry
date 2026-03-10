@@ -105,15 +105,59 @@ The following improvements were identified during review but were not implemente
 ### Summary
 If a 20-second cold start is a hard blocker for your business requirements, **upgrading to the Premium Plan with `Always Ready` instances is the only guaranteed solution** to practically eliminate it for an HTTP-triggered Telemetry API. Code optimizations on the Consumption plan might bring it down to 5-10 seconds, but never to zero.
 
-## Quick Verification
+## Testing Integration with Actual Azure Services
 
-Run the local command-line verification script:
+To test the telemetry pipeline locally against **actual** Azure services (Event Hubs and Cosmos DB), use the Azure Functions Core Tools instead of the offline test script.
+
+1. **Update Connection Strings**
+   Replace the placeholders in `local.settings.json` with your real Azure connection strings:
+   ```json
+   {
+     "IsEncrypted": false,
+     "Values": {
+       "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+       "FUNCTIONS_WORKER_RUNTIME": "python",
+       "AzureWebJobsFeatureFlags": "EnableWorkerIndexing",
+       "EventHubConnection": "Endpoint=sb://<your-real-namespace>.servicebus.windows.net/;SharedAccessKeyName=...;SharedAccessKey=...",
+       "CosmosDBConnection": "AccountEndpoint=https://<your-real-account>.documents.azure.com:443/;AccountKey=..."
+     }
+   }
+   ```
+   *(If you are not using a local storage emulator like Azurite, also set `AzureWebJobsStorage` to a real Azure Storage connection string).*
+
+2. **Start the Local Azure Functions Runtime**
+   Start the function app host:
+   ```bash
+   func start
+   ```
+   The runtime will read your bindings, hook up to the services, and expose an HTTP endpoint (usually `http://localhost:7071/api/telemetry`).
+
+3. **Send a Real Telemetry Payload**
+   Send test telemetry to verify Event Hub routing:
+   ```bash
+   curl -X POST http://localhost:7071/api/telemetry \
+     -H "Content-Type: application/json" \
+     -d '{"eventType": "eval.completed", "score": 0.95}'
+   ```
+   Or to verify direct Cosmos DB routing:
+   ```bash
+   curl -X POST "http://localhost:7071/api/telemetry?target=cosmosdb" \
+     -H "Content-Type: application/json" \
+     -d '{"events": [{"eventType": "eval.started"}, {"eventType": "eval.completed"}]}'
+   ```
+
+4. **Verify in Azure**
+   After receiving a `202 Accepted` response, log into the Azure Portal to verify the messages arrived in your Event Hub or Cosmos DB container.
+
+## Quick Offline Verification
+
+To run unit tests without requiring active Azure resources, run the local command-line verification script:
 
 ```bash
 python tests/test_telemetry_cli.py
 ```
 
-This script verifies:
+This script explicitly bypasses the Azure Functions Runtime to verify core validation and routing logic:
 - HTTP ingestion to Event Hub
 - direct HTTP routing to Cosmos DB
 - invalid JSON rejection

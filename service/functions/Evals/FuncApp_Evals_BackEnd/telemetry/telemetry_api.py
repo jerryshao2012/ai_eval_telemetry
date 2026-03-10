@@ -61,7 +61,7 @@ def _enrich_event(event: Dict[str, Any], trace_id: str, default_received_at: str
 )
 @telemetry_bp.cosmos_db_output(
     arg_name="cosmos",
-    database_name="TelemetryDB",
+    database_name="telemetry_db",
     container_name="Events",
     connection="CosmosDBConnection",
     create_if_not_exists=True
@@ -128,7 +128,7 @@ def ingest_telemetry(req: func.HttpRequest, event: func.Out[str], cosmos: func.O
 )
 @telemetry_bp.cosmos_db_output(
     arg_name="cosmos",
-    database_name="TelemetryDB",
+    database_name="telemetry_db",
     container_name="Events",
     connection="CosmosDBConnection",
     create_if_not_exists=True
